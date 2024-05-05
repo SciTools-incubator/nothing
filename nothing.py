@@ -31,9 +31,9 @@ class Progress(abc.ABC):
     """:meth:`run` will begin at this step + 1. Enables resuming from a saved state."""
 
     _dry_run: bool = False
-    """If True, will only attempt instantiation, without saving or running steps."""
+    """If True, will only attempt instantiation, without saving or running get_steps."""
 
-    def __new__(cls, *args: list[Any], **kwargs: dict[str, Any]) -> "Progress":
+    def __new__(cls, *args: Any, **kwargs: Any) -> "Progress":
         # It is essential to correct operation that cls itself is @dataclass
         #  decorated, not just inheriting decoration from a parent class.
         #  (Otherwise cls attributes will not be included in cls.__init__).
@@ -103,6 +103,7 @@ class Progress(abc.ABC):
     def load(cls, file_path: Path, dry_run: bool = False) -> Self:
         """Instantiate by loading a previous state from a saved file."""
         kwargs = json.loads(file_path.read_text())
+        del kwargs["comments"]
         return cls(_dry_run=dry_run, **kwargs)
 
     @classmethod
@@ -118,7 +119,7 @@ class Progress(abc.ABC):
             "load": (
                 "Resume a previous workflow by loading its saved JSON progress file. "
                 "NOTE this file can be manually edited to start at an alternative step "
-                "or use different values."
+                "or use alternative values."
             ),
             "template": (
                 "Create a new JSON progress file, which can be loaded by the `load` "
@@ -179,15 +180,39 @@ class Progress(abc.ABC):
             k: self.__dict__[k] for k in self.__match_args__ if not k.startswith("_")
         }
 
+    @property
+    def _save_file_comments(self) -> list[list[str]]:
+        """Comments that will be stored, but not loaded, in the save file.
+
+        Each comment is ``list[str]`` as a JSON-compatible way to store
+        multiline strings.
+        """
+        comments: list[list[str]] = []
+        cls_name = self.__class__.__name__
+        comments.append(
+            [
+                f"This file stores the progress of the {cls_name} do-nothing workflow.",
+                "It can be loaded to resume progress, and edited to resume from",
+                "an alternative step or use alternative values.",
+            ]
+        )
+        comments.append(
+            [
+                "Step names:",
+                *[f"{ix}: {step.__name__}" for ix, step in enumerate(self.get_steps())],
+            ]
+        )
+        return comments
+
     def run(self) -> None:
-        """Iteratively run the functions in :meth:`steps`.
+        """Iteratively run the functions in :meth:`get_steps`.
 
         Begins at :attr:`latest_complete_step` + 1, which enables started from
         previously saved progress via :meth:`load`.
         """
 
         index_first = self.latest_complete_step + 1
-        for step in self.steps()[index_first:]:
+        for step in self.get_steps()[index_first:]:
             index_current = self.latest_complete_step + 1
             self._logger.info(f"*** STEP {index_current} STARTING ***")
             step(self=self)
@@ -201,7 +226,8 @@ class Progress(abc.ABC):
         Includes validation that the saved file can be successfully reloaded.
         """
         self._logger.debug(f"Saving state: {self.state}")
-        json_rep = json.dumps(self.state, indent=0)
+        save_dict = dict(comments=self._save_file_comments) | self.state
+        json_rep = json.dumps(save_dict, indent=2)
         Path(self._file_path).write_text(json_rep)
         self._logger.debug("Save complete.")
 
@@ -223,7 +249,7 @@ class Progress(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def steps(cls) -> list[Callable[..., None]]:
+    def get_steps(cls) -> list[Callable[..., None]]:
         """Return a list of functions that represent the steps of the process."""
         return NotImplemented
 
@@ -243,7 +269,7 @@ class Demo(Progress):
         return "Demo workflow for nothing.py"
 
     @classmethod
-    def steps(cls) -> list[Callable[..., None]]:
+    def get_steps(cls) -> list[Callable[..., None]]:
         return [
             cls.set_var_1,
             cls.set_var_2,
