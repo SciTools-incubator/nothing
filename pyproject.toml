@@ -1,2 +1,11 @@
+[project]
+name = "nothing"
+version = "0.1"
+license = {text = "BSD-3-Clause"}
+requires-python = ">=3.11"
+description = "Functionality to support do-nothing workflows."
+readme = "README.md"
+maintainers = [{name = "SciTools Developers", email = "scitools.pub@gmail.com"}]
+
 [tool.mypy]
 strict = true
