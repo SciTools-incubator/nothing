@@ -12,8 +12,9 @@ from datetime import datetime
 import json
 import logging
 from pathlib import Path
-from sys import stdout
-from typing import Any, Self
+from sys import stderr, stdout
+from time import sleep
+from typing import Any, Optional, Self
 
 
 @dataclass
@@ -110,7 +111,7 @@ class Progress(abc.ABC):
     def main(cls) -> None:
         """Command-line interface for the do-nothing workflow."""
         parser = ArgumentParser(
-            description=cls.cmd_description(),
+            description=cls.get_cmd_description(),
         )
         subparsers = parser.add_subparsers(required=True)
 
@@ -214,6 +215,7 @@ class Progress(abc.ABC):
         index_first = self.latest_complete_step + 1
         for step in self.get_steps()[index_first:]:
             index_current = self.latest_complete_step + 1
+            self.print("")
             self._logger.info(f"*** STEP {index_current} STARTING ***")
             step(self=self)
             self._logger.info(f"*** STEP {index_current} COMPLETE ***")
@@ -243,7 +245,7 @@ class Progress(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def cmd_description(cls) -> str:
+    def get_cmd_description(cls) -> str:
         """Return a string describing the command-line interface."""
         return "SciTools do-nothing workflow"
 
@@ -253,20 +255,101 @@ class Progress(abc.ABC):
         """Return a list of functions that represent the steps of the process."""
         return NotImplemented
 
+    @staticmethod
+    def print(message: str) -> None:
+        """Print a line break, then a message, then wait 1sec."""
+        print()
+        print(message)
+        # Help with flow/visibility by waiting 1secs before proceeding.
+        sleep(1)
+
+    @staticmethod
+    def get_input(message: str, expected_inputs: str) -> str:
+        """Call :func:`input` with a custom message and input hint."""
+        Progress.print(message)
+        return input(expected_inputs + " : ")
+
+    @staticmethod
+    def wait_for_done(message: str) -> None:
+        """Print a message, then wait for user confirmation to proceed."""
+        Progress.print(message)
+        done = False
+        while not done:
+            done = input("Step complete? y / [n] : ").casefold() == "y".casefold()
+
+    @staticmethod
+    def report_problem(message: str) -> None:
+        """Print a message to STDERR, then wait 0.5secs."""
+        print(message, file=stderr)
+        # To ensure correct sequencing of messages.
+        sleep(0.5)
+
+    def set_value_from_input(
+        self,
+        key: str,
+        message: str,
+        expected_inputs: str,
+        post_process: Optional[Callable[[str], Any]],
+    ) -> None:
+        """Set an attribute value using :meth:`get_input`, defaulting to any current value.
+
+        The current value is typically present if instantiated via
+        :meth:`load`.
+
+        Parameters
+        ----------
+        key : str
+            The attribute to set.
+        message : str
+            The message shown before user input (see :meth:`get_input`).
+        expected_inputs : str
+            Hint shown before user input (see :meth:`get_input`).
+        post_process : callable, optional
+            Function defining anything to be done to the input before setting.
+            Must take a string as the only input, and return the desired value
+            to be set. If the function returns ``None`` (e.g. if input fails
+            validation) then input will be requested from the user again.
+
+        """
+        # Just keep the existing value if no post_process is provided.
+        post_process = post_process or (lambda x: x)
+
+        default = getattr(self, key, None)
+        input_final = None
+        while input_final is None:
+            if default is not None:
+                expected_inputs_final = (
+                    f"{expected_inputs}\nOR input nothing for `{default}`"
+                )
+            else:
+                expected_inputs_final = expected_inputs
+            input_new = Progress.get_input(message, expected_inputs_final)
+            if input_new == "":
+                input_final = default
+            else:
+                input_final = post_process(input_new)
+
+        self.__setattr__(key, input_final)
+
 
 class Demo(Progress):
     var_1: int = 0
     var_2: str | None = None
 
+    @classmethod
+    def get_cmd_description(cls) -> str:
+        return "Demo workflow for nothing.py"
+
     def set_var_1(self) -> None:
         self.var_1 = datetime.now().day
 
     def set_var_2(self) -> None:
-        self.var_2 = input("Input a string: ")
-
-    @classmethod
-    def cmd_description(cls) -> str:
-        return "Demo workflow for nothing.py"
+        self.set_value_from_input(
+            key="var_2",
+            message="Input a string",
+            expected_inputs="Either A or B or C",
+            post_process=lambda x: x if x in ["A", "B", "C"] else None,
+        )
 
     @classmethod
     def get_steps(cls) -> list[Callable[..., None]]:
