@@ -1,6 +1,6 @@
 # [nothing.py](nothing.py)
 
-An installable Python parent class to support do-nothing workflows.
+## An installable Python parent class to support do-nothing workflows.
 
 ```shell
 python nothing.py --help
@@ -25,6 +25,10 @@ python nothing.py --help
 ## Use
 
 - Install directly from GitHub.
+  - `pip install git+https://github.com/SciTools-incubator/nothing.git`
+  - Include in a requirements file:
+    - In a `requirements.txt`: `git+https://github.com/SciTools-incubator/nothing.git`
+    - In the `pip:` section of a Conda YAML: `- -e git://github.com/SciTools-incubator/nothing.git`
 - Create your own subclass of the `Progress` class. See the `Demo` class in
   [nothing.py](nothing.py) for an example.
 - Create a script that calls `YourClass.main()`.

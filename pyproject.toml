@@ -7,5 +7,8 @@ description = "Functionality to support do-nothing workflows."
 readme = "README.md"
 maintainers = [{name = "SciTools Developers", email = "scitools.pub@gmail.com"}]
 
+[project.urls]
+homepage = "https://github.com/SciTools-incubator/nothing"
+
 [tool.mypy]
 strict = true
