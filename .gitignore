@@ -164,4 +164,4 @@ cython_debug/
 # Ruff
 .ruff_cache
 
-**/.nothing/*
+**/.nothing
