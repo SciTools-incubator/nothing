@@ -360,4 +360,4 @@ class Demo(Progress):
 
 
 if __name__ == "__main__":
-    Demo.main()
+    Progress.main()
