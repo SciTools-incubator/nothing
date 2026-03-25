@@ -169,8 +169,7 @@ class Progress(abc.ABC):
             ]
         )
 
-    @property
-    def state(self) -> dict[str, Any]:
+    def __getstate__(self) -> dict[str, Any]:
         """Current values of all non-private dataclass attributes.
 
         Intended that these are the values that are used through the do-nothing
@@ -180,6 +179,9 @@ class Progress(abc.ABC):
         return {
             k: self.__dict__[k] for k in self.__match_args__ if not k.startswith("_")
         }
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
 
     @property
     def _save_file_comments(self) -> list[list[str]]:
@@ -227,8 +229,9 @@ class Progress(abc.ABC):
 
         Includes validation that the saved file can be successfully reloaded.
         """
-        self._logger.debug(f"Saving state: {self.state}")
-        save_dict = dict(comments=self._save_file_comments) | self.state
+        state = self.__getstate__()
+        self._logger.debug(f"Saving state: {state}")
+        save_dict = dict(comments=self._save_file_comments) | state
         json_rep = json.dumps(save_dict, indent=2)
         Path(self._file_path).write_text(json_rep)
         self._logger.debug("Save complete.")
@@ -360,4 +363,4 @@ class Demo(Progress):
 
 
 if __name__ == "__main__":
-    Progress.main()
+    Demo.main()
